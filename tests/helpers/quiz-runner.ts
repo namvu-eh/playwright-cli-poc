@@ -82,23 +82,27 @@ export async function answerQuestions(page: Page, outputFile: string): Promise<v
   }
 
   while (true) {
+    const findStart = Date.now();
     const answers = page.locator(answerSelector);
     const count = await answers.count();
-    console.log(`[answerQuestions] Answer count: ${count}`);
+    const findMs = Date.now() - findStart;
+    console.log(`[answerQuestions] Answer count: ${count} | find-answer timing: ${findMs}ms`);
     if (count === 0) {
       console.log('[answerQuestions] No answer elements — quiz complete.');
       break;
     }
 
     const currentNum = await getCurrentQuestionNumber(page);
+    console.log(`[answerQuestions] Question counter: ${currentNum}`);
     const total = await page.evaluate(() => {
       const m = (document.body.textContent ?? '').match(/Câu hỏi\s*:\s*\d+\/(\d+)/);
       return m ? parseInt(m[1], 10) : 0;
     });
     const pick = Math.floor(Math.random() * count);
     console.log(`[answerQuestions] Q${++questionIndex} (${currentNum}/${total}): picking option ${pick + 1} of ${count}`);
-    await answers.nth(pick).click();
-    console.log(`[answerQuestions] Clicked option ${pick + 1}`);
+    const clickStart = Date.now();
+    await answers.nth(pick).click({ force: true, timeout: WAIT_TIMEOUT });
+    console.log(`[answerQuestions] Clicked option ${pick + 1} | click timing: ${Date.now() - clickStart}ms`);
 
     console.log('[answerQuestions] Checking if answer is wrong...');
     const isWrong = await page.getByText('Chưa chính xác', { exact: false })
@@ -177,8 +181,17 @@ export async function answerQuestions(page: Page, outputFile: string): Promise<v
     }
 
     // Also end if timer reaches 00:30:00
-    if (timerText === '00:30:00') {
-      console.log('[answerQuestions] Timer reached 00:30:00 — ending quiz.');
+    const timerText = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('*')]
+        .find(e => e.children.length === 0 && /^\d{2}:\d{2}:\d{2}$/.test(e.textContent?.trim() ?? ''));
+      return el?.textContent?.trim() ?? '';
+    });
+    console.log(`[answerQuestions] Timer: ${timerText || '(not found)'}`);
+    const timerSeconds = timerText
+      ? timerText.split(':').reduce((acc, v, i) => acc + parseInt(v) * [3600, 60, 1][i], 0)
+      : 0;
+    if (timerSeconds >= 900) {
+      console.log(`[answerQuestions] Timer >= 00:15:00 (${timerText}) — ending quiz.`);
       const ketThucBtn = page.locator('button').filter({ hasText: /Kết thúc luyện thi/ });
       const visible = await ketThucBtn.waitFor({ state: 'visible', timeout: WAIT_TIMEOUT }).then(() => true).catch(() => false);
       if (visible) {
@@ -218,22 +231,25 @@ export async function runQuiz(sectionName: string, outputFile: string, userKey: 
     console.log('[runQuiz] No multi-session modal.');
   }
 
-  console.log('[runQuiz] Checking for initial camera check...');
-  const cameraBtn = page.getByRole('button', { name: 'Xác nhận và lưu ảnh' });
-  const cameraCheckPresent = await cameraBtn.waitFor({ timeout: 30_000 }).then(() => true).catch(() => false);
-  if (cameraCheckPresent) {
-    console.log('[runQuiz] Camera check detected. Waiting for user to click "Xác nhận và lưu ảnh"...');
-    await cameraBtn.waitFor({ state: 'hidden', timeout: 0 });
-    console.log('[runQuiz] Camera check completed.');
-  } else {
-    console.log('[runQuiz] No initial camera check.');
+  console.log('[runQuiz] Polling for camera check every 3s...');
+  while (true) {
+    const cameraVisible = await page.getByRole('button', { name: 'Xác nhận và lưu ảnh' })
+      .isVisible().catch(() => false);
+    if (cameraVisible) {
+      console.log('[runQuiz] Camera check detected. Waiting for user to click "Xác nhận và lưu ảnh"...');
+      await page.getByRole('button', { name: 'Xác nhận và lưu ảnh' })
+        .waitFor({ state: 'hidden', timeout: 0 });
+      console.log('[runQuiz] Camera check completed.');
+      break;
+    }
+    const overlayGone = await page.evaluate(() => !document.querySelector('.using-camera-check-active'));
+    if (overlayGone) {
+      console.log('[runQuiz] No camera check detected. Proceeding.');
+      break;
+    }
+    console.log('[runQuiz] Camera not ready yet, retrying in 3s...');
+    await page.waitForTimeout(3_000);
   }
-
-  console.log('[runQuiz] Waiting for camera overlay to clear...');
-  await page.waitForFunction(
-    () => !document.querySelector('.using-camera-check-active'),
-    { timeout: 0 }
-  ).catch(() => null);
   console.log('[runQuiz] Camera overlay cleared. Entering round loop.');
 
   let round = 0;
@@ -255,24 +271,6 @@ export async function runQuiz(sectionName: string, outputFile: string, userKey: 
     await page.locator('[class*="mc-text-question__radio-answer"]').first()
       .waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).catch(() => null);
     console.log('[runQuiz] Answer elements visible. URL:', page.url());
-
-    console.log('[runQuiz] Checking for quiz camera check...');
-    const cameraBtn2 = page.getByRole('button', { name: 'Xác nhận và lưu ảnh' });
-    const cameraPresent2 = await cameraBtn2.waitFor({ state: 'visible', timeout: 30_000 }).then(() => true).catch(() => false);
-    if (cameraPresent2) {
-      console.log('[runQuiz] Quiz camera check detected. Waiting for user to click "Xác nhận và lưu ảnh"...');
-      await cameraBtn2.waitFor({ state: 'hidden', timeout: 0 });
-      console.log('[runQuiz] Quiz camera check completed.');
-    } else {
-      console.log('[runQuiz] No quiz camera check.');
-    }
-
-    console.log('[runQuiz] Waiting for camera overlay to clear...');
-    await page.waitForFunction(
-      () => !document.querySelector('.using-camera-check-active'),
-      { timeout: 0 }
-    ).catch(() => null);
-    console.log('[runQuiz] Camera overlay gone. Starting answerQuestions...');
 
     await answerQuestions(page, outputFile);
 

@@ -1,6 +1,10 @@
 [
   {
-    "question": "Ý nghĩa các biểu tượng ghi trên biển chỉ dẫn là như thế nào?",
-    "correctAnswer": "Xăng dầu, ăn uống, thông tin, sửa chữa xe."
+    "question": "Trên đường cao tốc, gặp biển nào thì người lái xe đi được cả hai hướng (bên trái hoặc bên phải) để tránh chướng ngại vật?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Trong các biển dưới đây biển nào là biển “Hết mọi lệnh cấm”?",
+    "correctAnswer": "Biển 2."
   }
 ]
