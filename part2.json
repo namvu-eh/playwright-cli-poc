@@ -1,10 +1,166 @@
 [
   {
-    "question": "Trên đường cao tốc, gặp biển nào thì người lái xe đi được cả hai hướng (bên trái hoặc bên phải) để tránh chướng ngại vật?",
+    "question": "Gặp biển nào xe lam, xe xích lô máy được phép đi vào?",
+    "correctAnswer": "Biển 3."
+  },
+  {
+    "question": "Biển số 1 có ý nghĩa như thế nào?",
+    "correctAnswer": "Biển chỉ dẫn hết cấm đỗ xe theo giờ trong khu vực."
+  },
+  {
+    "question": "Biển nào báo hiệu khoảng cách thực tế từ nơi đặt biển đến nơi cần cự ly tối thiểu giữa hai xe?",
     "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển này có ý nghĩa như thế nào?",
+    "correctAnswer": "Ý 1 và ý 3."
+  },
+  {
+    "question": "Biển báo dưới đây có ý nghĩa như thế nào?",
+    "correctAnswer": "Báo hiệu tốc độ tối thiểu cho phép các xe cơ giới chạy."
+  },
+  {
+    "question": "Biển nào dưới đây cấm xe ô tô rẽ trái và quay đầu?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào báo hiệu “Hết đoạn đường ưu tiên”?",
+    "correctAnswer": "Biển 3."
+  },
+  {
+    "question": "Biển báo này có ý nghĩa như thế nào?",
+    "correctAnswer": "Tốc độ tối đa cho phép về ban đêm cho các phương tiện là 70 km/h."
+  },
+  {
+    "question": "Biển nào báo hiệu “Giao nhau với đường ưu tiên”?",
+    "correctAnswer": "Biển 3."
+  },
+  {
+    "question": "Biển nào cho phép được quay đầu xe đi theo hướng ngược lại khi đặt biển trước ngã ba, ngã tư?",
+    "correctAnswer": "Biển 3."
+  },
+  {
+    "question": "Biển số 1 có ý nghĩa như thế nào?",
+    "correctAnswer": "Báo hiệu cầu vượt liên thông."
+  },
+  {
+    "question": "Biển nào báo hiệu “Giao nhau với đường không ưu tiên”?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào xe được phép quay đầu nhưng không được rẽ trái?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Trong các biển dưới đây biển nào là biển “Hết tốc độ tối đa cho phép”?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Biển nào sau đây là biển “Dốc lên nguy hiểm”?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào cấm quay đầu xe?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào chỉ dẫn cho người tham gia giao thông biết vị trí và khoảng cách có làn đường cứu nạn hay làn thoát xe khẩn cấp?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào xe được phép rẽ trái?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào dưới đây báo hiệu đoạn đường hay xảy ra ùn tắc giao thông?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào báo hiệu cấm xe mô tô đi vào?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Biển nào báo hiệu sắp đến chỗ giao nhau nguy hiểm?",
+    "correctAnswer": "Cả ba biển."
+  },
+  {
+    "question": "Số 50 ghi trên biển báo dưới đây có ý nghĩa như thế nào?",
+    "correctAnswer": "Tốc độ tối đa các xe cơ giới được phép chạy."
+  },
+  {
+    "question": "Biển nào báo hiệu “Giao nhau có tín hiệu đèn”?",
+    "correctAnswer": "Biển 3."
+  },
+  {
+    "question": "Gặp biển nào người lái xe không được đỗ xe vào ngày chẵn?",
+    "correctAnswer": "Biển 1 và biển 3."
+  },
+  {
+    "question": "Biển nào cấm xe ô tô tải vượt?",
+    "correctAnswer": "Biển 2 và biển 3."
+  },
+  {
+    "question": "Biển nào cấm máy kéo?",
+    "correctAnswer": "Biển 2 và biển 3."
+  },
+  {
+    "question": "Biển nào báo hiệu “Đường giao nhau” của các tuyến đường cùng cấp?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Biển nào báo hiệu “Giao nhau với đường không ưu tiên”?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Gặp biển nào người lái xe phải nhường đường cho người đi bộ?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Gặp biển báo này, người tham gia giao thông phải xử lý như thế nào?",
+    "correctAnswer": "Phải giảm tốc độ đến mức an toàn và không được vượt khi đi qua khu vực này."
+  },
+  {
+    "question": "Biển này có ý nghĩa như thế nào?",
+    "correctAnswer": "Biển báo hiệu cho người lái xe biết số lượng làn đường trên mặt đường và hướng đi trên mỗi làn đường phải theo."
+  },
+  {
+    "question": "Biển báo này có ý nghĩa như thế nào?",
+    "correctAnswer": "Đường cấm súc vật vận tải hàng hóa hoặc hành khách dù kéo xe hay chở trên lưng đi qua."
   },
   {
     "question": "Trong các biển dưới đây biển nào là biển “Hết mọi lệnh cấm”?",
     "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Trong các biển dưới đây biển nào là biển “Hết tốc độ tối thiểu”?",
+    "correctAnswer": "Biển 3."
+  },
+  {
+    "question": "Gặp biển nào người tham gia giao thông phải đi chậm và thận trọng đề phòng khả năng xuất hiện và di chuyển bất ngờ của trẻ em trên mặt đường?",
+    "correctAnswer": "Biển 2."
+  },
+  {
+    "question": "Biển nào báo hiệu chiều dài đoạn đường phải giữ cự ly tối thiểu giữa hai xe?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Biển nào không cho phép rẽ phải?",
+    "correctAnswer": "Biển 1."
+  },
+  {
+    "question": "Khi gặp biển nào, người lái xe phải giảm tốc độ, chú ý xe đi ngược chiều, xe đi ở phía đường bị hẹp phải nhường đường cho xe đi ngược chiều?",
+    "correctAnswer": "Biển 2 và biển 3."
+  },
+  {
+    "question": "Biển báo này có ý nghĩa như thế nào?",
+    "correctAnswer": "Chỗ ngoặt nguy hiểm có nguy cơ lật xe bên phải khi đường cong vòng sang trái."
+  },
+  {
+    "question": "Khi gặp vạch kẻ đường nào các xe được phép đè vạch?",
+    "correctAnswer": "Vạch 1 và vạch 3."
+  },
+  {
+    "question": "Tại đoạn đường có cắm biển dưới đây, xe tải và xe khách có được phép đi vào không?",
+    "correctAnswer": "Có."
   }
 ]
