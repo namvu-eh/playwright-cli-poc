@@ -163,7 +163,7 @@ export async function answerQuestions(page: Page, outputFile: string): Promise<v
       break;
     }
     console.log('[answerQuestions] Clicking Tiếp...');
-    await tiepBtn.click();
+    await tiepBtn.click({ force: true });
     await waitForNextQuestion(page, currentNum);
 
     const nextNum = await getCurrentQuestionNumber(page);
