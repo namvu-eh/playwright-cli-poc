@@ -75,9 +75,6 @@ export async function answerQuestions(page: Page, outputFile: string): Promise<v
 
   if (!answerSelector) {
     console.log('[answerQuestions] No answer elements found after scan. URL:', page.url());
-    const html = await page.evaluate(() => document.body.innerHTML);
-    await fs.writeFile('D:/playwright-cli-poc/quiz-dom.html', html, 'utf-8');
-    console.log('[answerQuestions] DOM saved to quiz-dom.html');
     return;
   }
 
