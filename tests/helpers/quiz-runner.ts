@@ -180,7 +180,7 @@ export async function answerQuestions(page: Page, outputFile: string): Promise<v
       break;
     }
 
-    // Also end if timer reaches 00:30:00
+    // Also end if timer reaches 00:20:00
     const timerText = await page.evaluate(() => {
       const el = [...document.querySelectorAll('*')]
         .find(e => e.children.length === 0 && /^\d{2}:\d{2}:\d{2}$/.test(e.textContent?.trim() ?? ''));
@@ -190,8 +190,8 @@ export async function answerQuestions(page: Page, outputFile: string): Promise<v
     const timerSeconds = timerText
       ? timerText.split(':').reduce((acc, v, i) => acc + parseInt(v) * [3600, 60, 1][i], 0)
       : 0;
-    if (timerSeconds >= 3000) {
-      console.log(`[answerQuestions] Timer >= 00:50:00 (${timerText}) — ending quiz.`);
+    if (timerSeconds >= 1200) {
+      console.log(`[answerQuestions] Timer >= 00:20:00 (${timerText}) — ending quiz.`);
       const ketThucBtn = page.locator('button').filter({ hasText: /Kết thúc luyện thi/ });
       const visible = await ketThucBtn.waitFor({ state: 'visible', timeout: WAIT_TIMEOUT }).then(() => true).catch(() => false);
       if (visible) {
