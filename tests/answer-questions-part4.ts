@@ -280,69 +280,82 @@ async function runPart4Quiz(userKey: string = 'user1'): Promise<void> {
   // Finishing a section lands on a results screen, so each iteration navigates back here
   const sectionsUrl = page.url();
 
-  // Iterate all 6 "Luyện tất cả" sections in order
+  // Work through all 6 "Luyện tất cả" sections, then start over from the first
   const sectionCount = 6;
-  for (let sectionIdx = 0; sectionIdx < sectionCount; sectionIdx++) {
-    console.log(`\n[runPart4Quiz] === Section ${sectionIdx + 1}/${sectionCount} ===`);
+  let round = 0;
+  let sectionsAvailable = true;
 
-    await page.waitForLoadState('domcontentloaded').catch(() => null);
-    const allBtns = page.locator('button.btn-primary.btn-outline.btn-small').filter({ hasText: /Luyện tất cả/ });
+  while (sectionsAvailable) {
+    round += 1;
+    console.log(`\n[runPart4Quiz] ======== Round ${round} ========`);
 
-    // Returning from a finished section re-renders the list — wait for it before counting
-    const listReady = await allBtns.first()
-      .waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).then(() => true).catch(() => false);
-    if (!listReady) {
-      console.log('[runPart4Quiz] Section list missing — navigating back...');
-      await page.goto(sectionsUrl, { timeout: NAV_TIMEOUT }).catch(() => null);
-      await dismissEntryModals(page);
-      await allBtns.first().waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).catch(() => null);
-    }
+    for (let sectionIdx = 0; sectionIdx < sectionCount; sectionIdx++) {
+      console.log(`\n[runPart4Quiz] === Round ${round} | Section ${sectionIdx + 1}/${sectionCount} ===`);
 
-    const btnCount = await allBtns.count().catch(() => 0);
-    console.log(`[runPart4Quiz] Found ${btnCount} Luyện tất cả buttons`);
-
-    if (sectionIdx >= btnCount) {
-      console.log('[runPart4Quiz] No more sections. Done.');
-      break;
-    }
-
-    const sectionBtn = allBtns.nth(sectionIdx);
-    await sectionBtn.scrollIntoViewIfNeeded().catch(() => null);
-    const popupPromise = page.context().waitForEvent('page', { timeout: 5_000 }).catch(() => null);
-    await sectionBtn.click({ force: true, timeout: 60_000 });
-    console.log(`[runPart4Quiz] Clicked section ${sectionIdx + 1}`);
-
-    const popup = await popupPromise;
-    let activePage: Page;
-    if (popup) {
-      console.log('[runPart4Quiz] Popup detected.');
-      await popup.waitForLoadState('domcontentloaded').catch(() => null);
-      activePage = popup;
-    } else {
-      console.log('[runPart4Quiz] No popup — same page.');
       await page.waitForLoadState('domcontentloaded').catch(() => null);
-      activePage = page;
+      const allBtns = page.locator('button.btn-primary.btn-outline.btn-small').filter({ hasText: /Luyện tất cả/ });
+
+      // Returning from a finished section re-renders the list — wait for it before counting
+      const listReady = await allBtns.first()
+        .waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).then(() => true).catch(() => false);
+      if (!listReady) {
+        console.log('[runPart4Quiz] Section list missing — navigating back...');
+        await page.goto(sectionsUrl, { timeout: NAV_TIMEOUT }).catch(() => null);
+        await dismissEntryModals(page);
+        await allBtns.first().waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).catch(() => null);
+      }
+
+      const btnCount = await allBtns.count().catch(() => 0);
+      console.log(`[runPart4Quiz] Found ${btnCount} Luyện tất cả buttons`);
+
+      // Guard against spinning forever if the list never comes back
+      if (sectionIdx >= btnCount) {
+        console.log('[runPart4Quiz] Section list unavailable — stopping.');
+        sectionsAvailable = false;
+        break;
+      }
+
+      const sectionBtn = allBtns.nth(sectionIdx);
+      await sectionBtn.scrollIntoViewIfNeeded().catch(() => null);
+      const popupPromise = page.context().waitForEvent('page', { timeout: 5_000 }).catch(() => null);
+      await sectionBtn.click({ force: true, timeout: 60_000 });
+      console.log(`[runPart4Quiz] Clicked section ${sectionIdx + 1}`);
+
+      const popup = await popupPromise;
+      let activePage: Page;
+      if (popup) {
+        console.log('[runPart4Quiz] Popup detected.');
+        await popup.waitForLoadState('domcontentloaded').catch(() => null);
+        activePage = popup;
+      } else {
+        console.log('[runPart4Quiz] No popup — same page.');
+        await page.waitForLoadState('domcontentloaded').catch(() => null);
+        activePage = page;
+      }
+
+      // Wait 3s for the quiz modal/page to load after button click
+      await activePage.waitForTimeout(3_000);
+
+      console.log('[runPart4Quiz] Waiting for answer elements...');
+      await activePage.locator('[class*="mc-text-question__radio-answer"]').first()
+        .waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).catch(() => null);
+      console.log('[runPart4Quiz] Answer elements visible. URL:', activePage.url());
+
+      await answerQuestions(activePage, outputFile);
+
+      console.log(`[runPart4Quiz] Round ${round} | Section ${sectionIdx + 1} complete.`);
+      if (activePage !== page) {
+        await activePage.close().catch(() => null);
+        await page.waitForLoadState('domcontentloaded').catch(() => null);
+      }
     }
 
-    // Wait 3s for the quiz modal/page to load after button click
-    await activePage.waitForTimeout(3_000);
-
-    console.log('[runPart4Quiz] Waiting for answer elements...');
-    await activePage.locator('[class*="mc-text-question__radio-answer"]').first()
-      .waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).catch(() => null);
-    console.log('[runPart4Quiz] Answer elements visible. URL:', activePage.url());
-
-    await answerQuestions(activePage, outputFile);
-
-    console.log(`[runPart4Quiz] Section ${sectionIdx + 1} complete.`);
-    if (activePage !== page) {
-      await activePage.close().catch(() => null);
-      // Navigate back to the sections page
-      await page.waitForLoadState('domcontentloaded').catch(() => null);
+    if (sectionsAvailable) {
+      console.log(`\n[runPart4Quiz] Round ${round} complete — starting over from section 1.`);
     }
   }
 
-  console.log('[runPart4Quiz] All sections complete.');
+  console.log('[runPart4Quiz] Stopped.');
 }
 
 const userKey = process.argv[2] ?? 'user1';
