@@ -11,6 +11,9 @@ export async function launchAndLogin(userKey: string = 'user1'): Promise<{ brows
   const browser = await firefox.launch({
     headless: false,
     args: ['-width', '1920', '-height', '1080'],
+    firefoxUserPrefs: {
+      'permissions.default.camera': 1,
+    },
   });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 
