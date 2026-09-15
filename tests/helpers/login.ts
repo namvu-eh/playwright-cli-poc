@@ -1,29 +1,42 @@
-import { firefox } from 'playwright';
-import type { Browser, Page } from 'playwright';
+import type { BrowserContext, Page } from 'playwright';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+// @ts-ignore - patchright is a drop-in Playwright replacement with CDP leaks patched out
+import { chromium } from 'patchright';
 
 const config = JSON.parse(readFileSync(resolve(__dirname, '../../config.json'), 'utf-8'));
 
-export async function launchAndLogin(userKey: string = 'user1'): Promise<{ browser: Browser; page: Page }> {
+const PROFILE_DIR = resolve(__dirname, '../../.chrome-profile');
+
+export async function launchAndLogin(userKey: string = 'user1'): Promise<{ browser: BrowserContext; page: Page }> {
   const { username, password } = config[userKey] ?? (() => { throw new Error(`Unknown user key: "${userKey}"`); })();
 
-  const browser = await firefox.launch({
+  // patchright requires launchPersistentContext with no custom args and no viewport override;
+  // custom flags like --disable-blink-features=AutomationControlled are themselves detectable.
+  const context: BrowserContext = await chromium.launchPersistentContext(PROFILE_DIR, {
+    channel: 'chrome',
     headless: false,
-    args: ['-width', '1920', '-height', '1080'],
-    firefoxUserPrefs: {
-      'permissions.default.camera': 1,
-    },
+    viewport: null,
   });
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+
+  const page = context.pages().length > 0 ? context.pages()[0] : await context.newPage();
 
   await page.goto('https://hoancau.huelms.com/user/login', { timeout: 120_000 });
-  await page.locator('input[name="username"], input[type="text"]').first().fill(username);
+
+  // A logged-in profile redirects away from /user/login, so key off the form, not the URL
+  const userInput = page.locator('input[name="username"], input[type="text"]').first();
+  const needsLogin = await userInput.waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false);
+  if (!needsLogin) {
+    console.log(`Already logged in. User: ${userKey} | URL: ${page.url()}`);
+    return { browser: context, page };
+  }
+
+  await userInput.fill(username);
   await page.locator('input[name="password"], input[type="password"]').first().fill(password);
   await page.waitForTimeout(1000);
-  await page.locator('button[type="submit"], button.btn-primary').first().click({ force: true });
+  await page.locator('button[type="submit"], button.btn-primary').first().click();
   await page.waitForURL(url => !url.pathname.includes('/user/login'), { timeout: 15_000 });
 
-  console.log(`Login successful. User: ${userKey} | URL: ${page.url()}`);
-  return { browser, page };
+  console.log(`Login successful. User: ${userKey} | Browser: Chrome (patchright) | URL: ${page.url()}`);
+  return { browser: context, page };
 }

@@ -1,3 +1,12 @@
 node_modules/
 test-results/
 .playwright-cli/
+.playwright-mcp/
+
+# Browser profiles hold live session cookies — never commit
+.browser-profile/
+.chrome-profile/
+
+# Debug artifacts
+part4-section-dom.html
+quiz-investigation.yml

@@ -1,4 +1,3 @@
-import fs from 'fs/promises';
 import type { Page } from 'playwright';
 import { launchAndLogin } from './helpers/login';
 
@@ -27,6 +26,51 @@ async function clickItemByText(page: Page, text: string): Promise<void> {
   console.log(`[clickItemByText] Clicked: "${text}" | URL: ${page.url()}`);
 }
 
+// Blocking notices that can appear on entry or mid-quiz
+const NOTICE_TEXTS = [
+  'Chương trình đào tạo sắp hết hạn',
+  'Bạn đang học trên nhiều cửa sổ hoặc thiết bị mới',
+];
+
+// Pass timeoutMs only on entry; in-loop calls must not wait or they cost seconds per question.
+async function dismissNotice(page: Page, noticeText: string, timeoutMs = 0): Promise<boolean> {
+  const notice = page.getByText(noticeText, { exact: false }).first();
+  const shown = timeoutMs > 0
+    ? await notice.waitFor({ state: 'visible', timeout: timeoutMs }).then(() => true).catch(() => false)
+    : await notice.isVisible().catch(() => false);
+  if (!shown) return false;
+
+  const label = noticeText.slice(0, 35);
+  // Scope to the owning modal so a button from another open dialog can't be clicked
+  const modal = page.locator('.ant-modal-content').filter({ hasText: noticeText }).first();
+  const scope = (await modal.isVisible().catch(() => false)) ? modal : page;
+
+  for (const btnLabel of ['Xác nhận', 'Đóng', 'Đã hiểu', 'Bỏ qua', 'OK']) {
+    const btn = scope.getByRole('button', { name: btnLabel, exact: false }).first();
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click({ force: true }).catch(() => null);
+      console.log(`[dismissNotice] "${label}" closed via "${btnLabel}".`);
+      return true;
+    }
+  }
+
+  const closeIcon = page.locator('.ant-modal-close, .ant-modal-close-x').first();
+  if (await closeIcon.isVisible().catch(() => false)) {
+    await closeIcon.click({ force: true }).catch(() => null);
+    console.log(`[dismissNotice] "${label}" closed via modal X.`);
+    return true;
+  }
+
+  console.log(`[dismissNotice] "${label}" shown but no dismiss control found.`);
+  return false;
+}
+
+async function dismissNotices(page: Page, timeoutMs = 0): Promise<void> {
+  for (const text of NOTICE_TEXTS) {
+    await dismissNotice(page, text, timeoutMs);
+  }
+}
+
 async function getCurrentQuestionNumber(page: Page): Promise<number> {
   const text = await page.evaluate(() => document.body.textContent ?? '');
   const match = text.match(/Câu hỏi\s*:\s*(\d+)\/\d+/);
@@ -45,6 +89,31 @@ async function waitForNextQuestion(page: Page, currentNum: number): Promise<void
     { timeout: NEXT_Q_TIMEOUT }
   ).catch(() => null);
   console.log(`[waitForNextQuestion] Done.`);
+}
+
+// Must run on every quiz exit path — without it the practice stays open and the app
+// never returns to the section list.
+async function finishPractice(page: Page): Promise<void> {
+  const ketThucBtn = page.locator('button').filter({ hasText: /Kết thúc luyện thi/ }).first();
+  const visible = await ketThucBtn
+    .waitFor({ state: 'visible', timeout: WAIT_TIMEOUT }).then(() => true).catch(() => false);
+  if (!visible) {
+    console.log('[finishPractice] Kết thúc luyện thi not found.');
+    return;
+  }
+
+  await ketThucBtn.click({ force: true }).catch(() => null);
+  console.log('[finishPractice] Clicked: Kết thúc luyện thi');
+
+  for (const label of ['Xác nhận', 'Đồng ý', 'Kết thúc', 'OK']) {
+    const btn = page.getByRole('button', { name: label, exact: false }).first();
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click({ force: true }).catch(() => null);
+      console.log(`[finishPractice] Confirmed via "${label}".`);
+      break;
+    }
+  }
+  await page.waitForLoadState('domcontentloaded').catch(() => null);
 }
 
 async function answerQuestions(page: Page, outputFile: string): Promise<void> {
@@ -75,6 +144,8 @@ async function answerQuestions(page: Page, outputFile: string): Promise<void> {
       if (overlay) overlay.style.pointerEvents = 'none';
     }).catch(() => null);
 
+    await dismissNotices(page);
+
     // Count sub-question groups: each `mc-text-question` has 3 answers
     const subQuestionCount = await page.evaluate(() =>
       document.querySelectorAll('.mc-text-question, [class="mc-text-question"]').length
@@ -83,6 +154,7 @@ async function answerQuestions(page: Page, outputFile: string): Promise<void> {
 
     if (totalAnswers === 0) {
       console.log('[answerQuestions] No answer elements — quiz complete.');
+      await finishPractice(page);
       break;
     }
 
@@ -132,7 +204,8 @@ async function answerQuestions(page: Page, outputFile: string): Promise<void> {
     const tiepBtn = page.locator('button').filter({ hasText: /^Tiếp$/ });
     const tiepVisible = await tiepBtn.waitFor({ state: 'visible', timeout: WAIT_TIMEOUT }).then(() => true).catch(() => false);
     if (!tiepVisible) {
-      console.log('[answerQuestions] "Tiếp" not found — quiz complete.');
+      console.log('[answerQuestions] "Tiếp" not found — last question, finishing.');
+      await finishPractice(page);
       break;
     }
     console.log('[answerQuestions] Clicking Tiếp...');
@@ -141,15 +214,8 @@ async function answerQuestions(page: Page, outputFile: string): Promise<void> {
 
     const nextNum = await getCurrentQuestionNumber(page);
     if (total > 0 && nextNum >= total) {
-      console.log(`[answerQuestions] Last question reached (${nextNum}/${total}). Looking for Kết thúc luyện thi...`);
-      const ketThucBtn = page.locator('button').filter({ hasText: /Kết thúc luyện thi/ });
-      const visible = await ketThucBtn.waitFor({ state: 'visible', timeout: WAIT_TIMEOUT }).then(() => true).catch(() => false);
-      if (visible) {
-        await ketThucBtn.click();
-        console.log('[answerQuestions] Clicked: Kết thúc luyện thi');
-      } else {
-        console.log('[answerQuestions] Kết thúc luyện thi not found.');
-      }
+      console.log(`[answerQuestions] Last question reached (${nextNum}/${total}).`);
+      await finishPractice(page);
       break;
     }
 
@@ -164,12 +230,7 @@ async function answerQuestions(page: Page, outputFile: string): Promise<void> {
       : 0;
     if (timerSeconds >= 1200) {
       console.log(`[answerQuestions] Timer >= 00:20:00 (${timerText}) — ending quiz.`);
-      const ketThucBtn = page.locator('button').filter({ hasText: /Kết thúc luyện thi/ });
-      const visible = await ketThucBtn.waitFor({ state: 'visible', timeout: WAIT_TIMEOUT }).then(() => true).catch(() => false);
-      if (visible) {
-        await ketThucBtn.click();
-        console.log('[answerQuestions] Clicked: Kết thúc luyện thi');
-      }
+      await finishPractice(page);
       break;
     }
   }
@@ -177,75 +238,66 @@ async function answerQuestions(page: Page, outputFile: string): Promise<void> {
   console.log(`[answerQuestions] Done. Wrong: ${wrongAnswers.length}. Saved to ${outputFile}.json`);
 }
 
+async function dismissEntryModals(page: Page): Promise<void> {
+  await dismissNotices(page, 5_000);
+
+  const checkbox = page.getByLabel('Tôi đồng ý với nội quy của trung tâm', { exact: false });
+  const termsShown = await checkbox.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false);
+  if (termsShown) {
+    await checkbox.check().catch(() => null);
+    await page.getByRole('button', { name: 'Đồng ý' }).click().catch(() => null);
+    console.log('[dismissEntryModals] Accepted terms.');
+    await page.waitForLoadState('domcontentloaded').catch(() => null);
+  }
+
+  const cameraBtn = page.getByRole('button', { name: 'Xác nhận và lưu ảnh' });
+  const cameraShown = await cameraBtn.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false);
+  if (cameraShown) {
+    console.log('[dismissEntryModals] Camera check visible — complete the face scan (up to 120s)...');
+    await cameraBtn.waitFor({ state: 'hidden', timeout: 120_000 }).catch(() => null);
+    console.log('[dismissEntryModals] Camera check done.');
+  }
+
+  await page.evaluate(() => {
+    const styleEl = document.createElement('style');
+    styleEl.textContent = '.using-camera-check-active { pointer-events: none !important; }';
+    document.head.appendChild(styleEl);
+  }).catch(() => null);
+}
+
 async function runPart4Quiz(userKey: string = 'user1'): Promise<void> {
   const outputFile = 'part4';
   console.log(`[runPart4Quiz] Starting. User: ${userKey} | Output: ${outputFile}.json`);
   const { browser, page } = await launchAndLogin(userKey);
 
+  await dismissNotices(page, 10_000);
   await clickItemByText(page, 'Mô phỏng các tình huống giao thông');
   await clickItemByText(page, 'Ôn luyện');
 
-  console.log('[runPart4Quiz] Waiting for terms checkbox...');
-  const checkbox = page.getByLabel('Tôi đồng ý với nội quy của trung tâm', { exact: false });
-  await checkbox.waitFor({ timeout: WAIT_TIMEOUT });
-  await checkbox.check();
-  console.log('[runPart4Quiz] Checked: Tôi đồng ý với nội quy của trung tâm');
-
-  await page.getByRole('button', { name: 'Đồng ý' }).click();
-  console.log('[runPart4Quiz] Clicked: Đồng ý');
-  await page.waitForLoadState('domcontentloaded').catch(() => null);
-
-  console.log('[runPart4Quiz] Checking for multi-session modal...');
-  const xacNhanBtn = page.getByRole('button', { name: 'Xác nhận' });
-  const appeared = await xacNhanBtn.waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
-  if (appeared) {
-    await xacNhanBtn.click();
-    console.log('[runPart4Quiz] Dismissed multi-session modal: Xác nhận');
-  } else {
-    console.log('[runPart4Quiz] No multi-session modal.');
-  }
-
-  console.log('[runPart4Quiz] Waiting up to 120s for camera check to be completed manually...');
-  const cameraBtn = page.getByRole('button', { name: 'Xác nhận và lưu ảnh' });
-  const cameraAppeared = await cameraBtn.waitFor({ state: 'visible', timeout: 30_000 }).then(() => true).catch(() => false);
-  if (cameraAppeared) {
-    console.log('[runPart4Quiz] Camera check visible. Waiting for it to be dismissed (up to 120s)...');
-    await cameraBtn.waitFor({ state: 'hidden', timeout: 120_000 }).catch(() => null);
-    console.log('[runPart4Quiz] Camera check done.');
-    await page.evaluate(() => {
-      const styleEl = document.createElement('style');
-      styleEl.textContent = '.using-camera-check-active { pointer-events: none !important; }';
-      document.head.appendChild(styleEl);
-    }).catch(() => null);
-  } else {
-    console.log('[runPart4Quiz] No camera check within 30s. Proceeding.');
-  }
+  await dismissEntryModals(page);
   console.log('[runPart4Quiz] Entering round loop.');
 
-  // Dump the 6 sections structure once for investigation
-  const sectionsDump = await page.evaluate(() => {
-    const luyenEls = Array.from(document.querySelectorAll('*')).filter(el =>
-      el.children.length === 0 && el.textContent?.trim().includes('Luyện tất cả')
-    );
-    return luyenEls.map((el, i) => ({
-      index: i,
-      text: el.textContent?.trim().slice(0, 80),
-      tag: el.tagName,
-      cls: el.className,
-      parentCls: el.parentElement?.className ?? '',
-      grandparentCls: el.parentElement?.parentElement?.className ?? '',
-    }));
-  }).catch(e => `evaluate error: ${e}`);
-  console.log('[runPart4Quiz] Sections dump:', JSON.stringify(sectionsDump, null, 2));
+  // Finishing a section lands on a results screen, so each iteration navigates back here
+  const sectionsUrl = page.url();
 
   // Iterate all 6 "Luyện tất cả" sections in order
   const sectionCount = 6;
   for (let sectionIdx = 0; sectionIdx < sectionCount; sectionIdx++) {
     console.log(`\n[runPart4Quiz] === Section ${sectionIdx + 1}/${sectionCount} ===`);
 
-    // Re-query all Luyện tất cả buttons (in case page re-rendered)
     await page.waitForLoadState('domcontentloaded').catch(() => null);
     const allBtns = page.locator('button.btn-primary.btn-outline.btn-small').filter({ hasText: /Luyện tất cả/ });
+
+    // Returning from a finished section re-renders the list — wait for it before counting
+    const listReady = await allBtns.first()
+      .waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).then(() => true).catch(() => false);
+    if (!listReady) {
+      console.log('[runPart4Quiz] Section list missing — navigating back...');
+      await page.goto(sectionsUrl, { timeout: NAV_TIMEOUT }).catch(() => null);
+      await dismissEntryModals(page);
+      await allBtns.first().waitFor({ state: 'visible', timeout: NAV_TIMEOUT }).catch(() => null);
+    }
+
     const btnCount = await allBtns.count().catch(() => 0);
     console.log(`[runPart4Quiz] Found ${btnCount} Luyện tất cả buttons`);
 
@@ -274,23 +326,6 @@ async function runPart4Quiz(userKey: string = 'user1'): Promise<void> {
 
     // Wait 3s for the quiz modal/page to load after button click
     await activePage.waitForTimeout(3_000);
-
-    // Dump the page DOM after clicking Luyện tất cả (investigation mode)
-    if (sectionIdx === 0) {
-      const pageHtml = await activePage.evaluate(() => document.body.innerHTML.slice(0, 8000)).catch(() => '');
-      await fs.writeFile('part4-section-dom.html', pageHtml, 'utf-8');
-      console.log('[runPart4Quiz] Dumped section DOM to part4-section-dom.html');
-
-      const quizStructure = await activePage.evaluate(() => {
-        const allInputs = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
-        const allBtns = Array.from(document.querySelectorAll('button')).map(b => b.textContent?.trim()).filter(Boolean);
-        const allLabels = Array.from(document.querySelectorAll('label')).map(l => ({ text: l.textContent?.trim().slice(0,80), cls: l.className }));
-        const modalEls = Array.from(document.querySelectorAll('[class*="modal"], [class*="overlay"], [class*="quiz"], [class*="question"], [class*="scenario"]'))
-          .map(el => ({ tag: el.tagName, cls: el.className.slice(0,80), children: el.children.length }));
-        return { inputs: allInputs.length, buttons: allBtns, labels: allLabels.slice(0,10), modals: modalEls.slice(0,10) };
-      }).catch(e => `error: ${e}`);
-      console.log('[runPart4Quiz] Quiz structure:', JSON.stringify(quizStructure, null, 2));
-    }
 
     console.log('[runPart4Quiz] Waiting for answer elements...');
     await activePage.locator('[class*="mc-text-question__radio-answer"]').first()
